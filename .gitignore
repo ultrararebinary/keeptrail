@@ -1,6 +1,4 @@
 .DS_Store
-node_modules/
-dist/
 .env
 .env.*
 !.env.example
@@ -8,11 +6,19 @@ dist/
 .venv/
 data/
 tmp/
+node_modules/
+dist/
+.vite/
 coverage/
 playwright-report/
 test-results/
+.keeptrail/
+*.local
+*.log
 *.sqlite
 *.sqlite-*
 *.db
-*.log
 cookies*.txt
+*.tsbuildinfo
+models/
+tools/

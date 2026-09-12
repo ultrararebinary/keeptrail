@@ -6,7 +6,7 @@ A local discovery library that turns saved videos, links, and images into search
 
 ## Status
 
-**Specification stage. The application is not implemented yet.** This repository currently contains the approved brand direction, UI exploration references, and a detailed MVP implementation prompt. Screenshots under `docs/design` are generated design references containing illustrative content, not functioning product screenshots.
+**MVP shell implemented.** Keeptrail now has a local Fastify API, SQLite migrations, a durable worker queue, a desktop-first Search/Explore UI, settings, exports, read-only MCP tools, fixture seeding, unit tests, and a Playwright smoke test. Provider-backed social acquisition, Whisper media transcription, local embeddings, and OmniRoute/Gemini analysis remain explicit follow-up gates and are documented as such.
 
 ## Build brief
 
@@ -15,10 +15,25 @@ The MVP combines a search-oriented library with a transit-map exploration view. 
 - [Full implementation prompt](docs/MVP_AGENT_PROMPT.md)
 - [Key preparation and agent handoff](QUICKSTART.md)
 - [Brand proposal](docs/BRAND.md)
+- [Implementation status](docs/IMPLEMENTATION_STATUS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Privacy boundary](docs/DATA_PRIVACY.md)
 
 ## Intended data flow
 
 Local storage and transcription. Selected text and captures are sent through a local OmniRoute gateway to Google for analysis. Free provider quotas and source-download restrictions apply. Use a Gemini API project without billing enabled; no paid provider fallback is planned.
+
+## Start locally
+
+```sh
+npm install
+npm run build
+npm run setup
+npm run demo:seed # optional, explicit fixture data only
+npm start
+```
+
+Open `http://127.0.0.1:4317`. Use `npm run doctor` for environment checks. See [QUICKSTART.md](QUICKSTART.md) for the Node 22.23.2 bootstrap path and [docs/TEST_REPORT.md](docs/TEST_REPORT.md) for current verification evidence.
 
 ## License
 
