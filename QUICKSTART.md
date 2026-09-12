@@ -26,15 +26,15 @@ npm start
 
 Open `http://127.0.0.1:4317`. Omit `npm run demo:seed` for a clean library; fixture creation is never implicit. Run `npm run doctor` to check Node, the data directory, SQLite migrations, and optional media commands.
 
-## 3. Create one free cloud key
+## 3. Create a free cloud key
 
-Open [Google AI Studio API keys](https://aistudio.google.com/api-keys), sign in, and create an API key for a new Google project without Cloud Billing enabled. Confirm the project's free-tier status in AI Studio. Do not enable paid billing or use a billing-enabled project for this MVP. Available free quotas depend on the account, model, and region.
+The easiest setup is **Groq**. Open [GroqCloud](https://console.groq.com/), create an account, then open [API Keys](https://console.groq.com/keys), choose **Create API Key**, name it `Keeptrail`, and copy it once. Do not add billing. In Keeptrail, choose **Groq** in Settings, paste the key, and select **Save provider**. Groq's Qwen 3.6 model accepts text and screenshots.
 
-Use a **Gemini Developer API key**, not a Vertex AI service-account credential. The fixed model is **gemini-2.5-flash-lite**, which accepts text and images and returns text. One key handles both jobs. No separate image-generation, OpenAI, Anthropic, Hugging Face, or downloader API key is needed.
+You can also use **OpenRouter Free**. Create an account at [OpenRouter](https://openrouter.ai/), open [Settings → Keys](https://openrouter.ai/settings/keys), choose **Create Key**, and copy it once. Do not purchase credits. In Keeptrail, choose **OpenRouter Free**, paste the key, and select **Save provider**. Its Free Models Router selects an available free vision model automatically.
 
-Keep the key private. Enter it in **Keeptrail → Settings**. Keeptrail stores it in the local data directory's `config/gemini.key` with mode 0600 and never returns the value through the API. The current worker marks cloud-dependent jobs as waiting for the key; OmniRoute/Gemini invocation is a follow-up implementation gate. Never paste the key into GitHub, a prompt, a screenshot, or chat.
+Google Gemini is still available if your account can use it; its instructions remain in [Free provider setup](docs/PROVIDERS.md). Keep every key private. Keeptrail stores the selected key in the local data directory with mode 0600 and never returns the value through the API. Never paste a key into GitHub, a prompt, a screenshot, or chat.
 
-Free-tier content handling follows [Google's terms](https://ai.google.dev/gemini-api/terms); selected source text and screenshots leave the machine for analysis. Pricing: [Gemini 2.5 Flash-Lite](https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite). Quotas: [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
+Selected source text and screenshots leave the machine for analysis. Read each provider's terms and current limits before use. Keeptrail's provider-specific links and quotas are documented in [PROVIDERS.md](docs/PROVIDERS.md).
 
 ## 4. Run the implementation agent
 
@@ -57,8 +57,8 @@ On a different machine, the agent can start `gh auth login --hostname github.com
 | Job | Selection | Key |
 | --- | --- | --- |
 | Local transcription | whisper.cpp v1.9.4 + ggml-small.bin, multilingual | None |
-| Text extraction and synthesis | Gemini 2.5 Flash-Lite through OmniRoute 3.8.50 | Gemini key |
-| Screenshot/image understanding | Same Gemini 2.5 Flash-Lite | Same key |
+| Text extraction and synthesis | Groq Qwen 3.6 or OpenRouter Free through OmniRoute 3.8.50 | Selected provider key |
+| Screenshot/image understanding | Same selected multimodal provider | Same key |
 | Semantic search | Quantized multilingual-e5-small, local CPU | None |
 
 The web/page acquisition path is implemented for ordinary HTTP(S) pages with a 5 MiB HTML cap. Social download, Whisper, embeddings, and OmniRoute are specified integration surfaces but not completed live tests. An API key cannot guarantee that a social platform will permit every download or that free quota is available at all times.

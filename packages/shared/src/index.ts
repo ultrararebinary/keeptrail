@@ -147,7 +147,30 @@ export const UpdateItemRequest = z.object({
   collectionIds: z.array(z.string().uuid()).max(30).optional()
 }).strict();
 
+export const ProviderId = z.enum(['groq', 'openrouter', 'gemini']);
+export type ProviderId = z.infer<typeof ProviderId>;
+
+export const ProviderDescriptor = z.object({
+  id: ProviderId,
+  name: z.string().max(80),
+  model: z.string().max(160),
+  keyUrl: z.string().url(),
+  docsUrl: z.string().url(),
+  freeSummary: z.string().max(500),
+  supportsVision: z.literal(true)
+}).strict();
+export type ProviderDescriptor = z.infer<typeof ProviderDescriptor>;
+
 export const Settings = z.object({
+  provider: ProviderId,
+  providerName: z.string().max(80),
+  hasProviderKey: z.boolean(),
+  keyUrl: z.string().url(),
+  docsUrl: z.string().url(),
+  freeSummary: z.string().max(500),
+  supportsVision: z.literal(true),
+  providers: z.array(ProviderDescriptor).min(1),
+  // Kept for compatibility with clients built against the original MVP shell.
   hasGeminiKey: z.boolean(),
   browserSessionEnabled: z.boolean(),
   browserName: z.enum(['chrome', 'firefox']).nullable(),
@@ -156,7 +179,7 @@ export const Settings = z.object({
   processingPaused: z.boolean(),
   dataDirectory: z.string(),
   gatewayStatus: z.enum(['not_configured', 'healthy', 'unavailable']),
-  model: z.literal('gemini-2.5-flash-lite')
+  model: z.string().max(160)
 }).strict();
 export type Settings = z.infer<typeof Settings>;
 

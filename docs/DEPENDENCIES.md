@@ -17,9 +17,9 @@ The setup and doctor scripts look for `ffmpeg`, `ffprobe`, and `python3`. Their 
 - `ffmpeg` / `ffprobe`: media inspection and deterministic audio/frame extraction.
 - `whisper.cpp` v1.9.4 plus the multilingual `ggml-small.bin` model: on-device transcription.
 - Quantized multilingual-e5-small: local CPU embeddings.
-- OmniRoute 3.8.50 plus Gemini 2.5 Flash-Lite: selected text/captures analysis only.
+- OmniRoute 3.8.50 plus one selected free multimodal provider: Groq Qwen 3.6 (recommended), OpenRouter Free Models Router, or Google Gemini.
 
-No API key is read from an environment variable. The UI writes a Gemini key to the protected local config file described in [DATA_PRIVACY.md](DATA_PRIVACY.md).
+No API key is read from an environment variable. The UI writes the selected provider key to the protected local config file described in [DATA_PRIVACY.md](DATA_PRIVACY.md).
 
 ## Supply-chain notes
 

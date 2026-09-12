@@ -37,8 +37,8 @@ export async function processJob(db: KeeptrailDb, job: { id: string; itemId: str
   const item = db.prepare('SELECT id,type,platform,source_url,title,description FROM items WHERE id=?').get(job.itemId) as { id: string; type: string; platform: string; source_url: string | null; title: string; description: string } | undefined;
   if (!item) return { status: 'failed', message: 'Source item no longer exists.' };
   if (job.stage !== 'acquire') {
-    completeJob(db, job.id, item.id, 'waiting_for_key', 'Cloud analysis is waiting for a Gemini key in Settings.');
-    return { status: 'waiting', message: 'Cloud analysis is waiting for a Gemini key in Settings.' };
+    completeJob(db, job.id, item.id, 'waiting_for_key', 'Cloud analysis is waiting for the selected provider key in Settings.');
+    return { status: 'waiting', message: 'Cloud analysis is waiting for the selected provider key in Settings.' };
   }
   if (!item.source_url) {
     completeJob(db, job.id, item.id, 'ready');

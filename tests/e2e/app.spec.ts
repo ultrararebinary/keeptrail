@@ -16,6 +16,8 @@ test.describe('Keeptrail desktop shell', () => {
 
     await page.getByRole('button', { name: 'Open settings' }).click();
     await expect(page.getByRole('heading', { name: 'Provider health' })).toBeVisible();
-    await expect(page.getByLabel('Gemini API key')).toHaveAttribute('type', 'password');
+    await expect(page.getByLabel('AI provider')).toHaveValue('groq');
+    await expect(page.getByLabel('Groq API key')).toHaveAttribute('type', 'password');
+    await expect(page.getByRole('option', { name: 'OpenRouter Free' })).toHaveCount(1);
   });
 });

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import {
   APP_VERSION, openDatabase, ensureDataDirectory, listLibrary, getItemDetail, importUrl, updateItem, graph, newId, contentHash
 } from '@keeptrail/core';
-import { ImportUrlsRequest, ItemDetail, LibraryResponse, Settings, UpdateItemRequest } from '@keeptrail/shared';
+import { ImportUrlsRequest, ItemDetail, LibraryResponse, ProviderId, Settings, UpdateItemRequest } from '@keeptrail/shared';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDirectory = ensureDataDirectory();
@@ -34,7 +34,58 @@ function setSetting(key: string, value: string): void {
   db.prepare('INSERT INTO settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at').run(key, value, new Date().toISOString());
 }
 
-const geminiKeyPath = join(dataDirectory, 'config', 'gemini.key');
+const providers = {
+  groq: {
+    id: 'groq', name: 'Groq', model: 'groq/qwen/qwen3.6-27b',
+    keyUrl: 'https://console.groq.com/keys', docsUrl: 'https://console.groq.com/docs/vision',
+    freeSummary: 'Free developer tier: Qwen 3.6 accepts text and up to five images per request. Groq documents 30 RPM, 1,000 requests/day, 8,000 TPM, and 200,000 TPD for this model.', supportsVision: true
+  },
+  openrouter: {
+    id: 'openrouter', name: 'OpenRouter Free', model: 'openrouter/openrouter/free',
+    keyUrl: 'https://openrouter.ai/settings/keys', docsUrl: 'https://openrouter.ai/docs/cookbook/get-started/free-models-router-playground',
+    freeSummary: 'The Free Models Router accepts text and images and chooses an available free vision model. OpenRouter documents 50 free-model requests/day without purchased credits; availability can change.', supportsVision: true
+  },
+  gemini: {
+    id: 'gemini', name: 'Google Gemini', model: 'gemini/gemini-2.5-flash-lite',
+    keyUrl: 'https://aistudio.google.com/api-keys', docsUrl: 'https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite',
+    freeSummary: 'Google AI Studio Developer API with billing disabled. Availability depends on account, region, and Google free-tier limits.', supportsVision: true
+  }
+} as const;
+
+function currentProvider(): ProviderId {
+  const parsed = ProviderId.safeParse(setting('ai_provider', 'groq'));
+  return parsed.success ? parsed.data : 'groq';
+}
+
+function providerKeyPath(provider: ProviderId): string {
+  return join(dataDirectory, 'config', `${provider}.key`);
+}
+
+function providerKeyConfigured(provider: ProviderId): boolean {
+  return setting(`${provider}_key_configured`, '0') === '1';
+}
+
+function settingsPayload() {
+  const provider = currentProvider();
+  const descriptor = providers[provider];
+  return Settings.parse({
+    provider,
+    providerName: descriptor.name,
+    hasProviderKey: providerKeyConfigured(provider),
+    keyUrl: descriptor.keyUrl,
+    docsUrl: descriptor.docsUrl,
+    freeSummary: descriptor.freeSummary,
+    supportsVision: descriptor.supportsVision,
+    providers: Object.values(providers),
+    hasGeminiKey: providerKeyConfigured('gemini'),
+    browserSessionEnabled: setting('browser_session_enabled', '0') === '1',
+    browserName: (setting('browser_name', '') || null) as 'chrome' | 'firefox' | null,
+    dailyCloudCap: Number(setting('daily_cloud_cap', '30')),
+    cloudCallsToday: Number(setting('cloud_calls_today', '0')),
+    processingPaused: setting('processing_paused', '0') === '1', dataDirectory,
+    gatewayStatus: providerKeyConfigured(provider) ? 'unavailable' : 'not_configured', model: descriptor.model
+  });
+}
 
 function resolveAssetPath(relativePath: string): string | null {
   const root = resolve(dataDirectory);
@@ -56,7 +107,7 @@ app.get('/api/health', async () => {
     dataDirectory,
     database: 'ok',
     worker: Number.isFinite(heartbeat) && Date.now() - heartbeat < 5_000 ? 'online' : 'offline',
-    gateway: setting('gemini_key_configured', '0') === '1' ? 'configured' : 'not_configured'
+    gateway: providerKeyConfigured(currentProvider()) ? 'configured' : 'not_configured'
   };
 });
 
@@ -130,36 +181,34 @@ app.patch('/api/items/:id', async (request, reply) => {
   return reply.send(getItemDetail(db, itemId));
 });
 
-app.get('/api/settings', async () => Settings.parse({
-  hasGeminiKey: setting('gemini_key_configured', '0') === '1', browserSessionEnabled: setting('browser_session_enabled', '0') === '1',
-  browserName: (setting('browser_name', '') || null) as 'chrome' | 'firefox' | null, dailyCloudCap: Number(setting('daily_cloud_cap', '30')),
-  cloudCallsToday: Number(setting('cloud_calls_today', '0')), processingPaused: setting('processing_paused', '0') === '1', dataDirectory,
-  gatewayStatus: setting('gemini_key_configured', '0') === '1' ? 'unavailable' : 'not_configured', model: 'gemini-2.5-flash-lite'
-}));
+app.get('/api/providers', async () => Object.values(providers));
+
+app.get('/api/settings', async () => settingsPayload());
 
 app.patch('/api/settings', async (request, reply) => {
-  const body = request.body as { geminiKey?: string | null; browserSessionEnabled?: boolean; browserName?: 'chrome' | 'firefox' | null; dailyCloudCap?: number; processingPaused?: boolean; billingAcknowledged?: boolean };
-  if (body.geminiKey !== undefined) {
-    if (body.geminiKey && body.geminiKey.length < 20) return reply.code(400).send({ error: 'That Gemini key looks too short.' });
-    if (body.geminiKey) {
-      await writeFile(geminiKeyPath, `${body.geminiKey.trim()}\n`, { encoding: 'utf8', mode: 0o600 });
-      await chmod(geminiKeyPath, 0o600);
-    } else if (body.geminiKey === null) {
-      await unlink(geminiKeyPath).catch(() => undefined);
+  const body = request.body as { provider?: string; apiKey?: string | null; geminiKey?: string | null; browserSessionEnabled?: boolean; browserName?: 'chrome' | 'firefox' | null; dailyCloudCap?: number; processingPaused?: boolean; billingAcknowledged?: boolean };
+  const selected = body.provider === undefined ? currentProvider() : ProviderId.safeParse(body.provider);
+  if (typeof selected !== 'string' && !selected.success) return reply.code(400).send({ error: 'Choose Groq, OpenRouter Free, or Google Gemini.' });
+  const provider = typeof selected === 'string' ? selected : selected.data;
+  setSetting('ai_provider', provider);
+  const submittedKey = body.apiKey !== undefined ? body.apiKey : provider === 'gemini' ? body.geminiKey : undefined;
+  if (submittedKey !== undefined) {
+    if (submittedKey && submittedKey.trim().length < 20) return reply.code(400).send({ error: 'That API key looks too short.' });
+    const keyPath = providerKeyPath(provider);
+    if (submittedKey) {
+      await writeFile(keyPath, `${submittedKey.trim()}\n`, { encoding: 'utf8', mode: 0o600 });
+      await chmod(keyPath, 0o600);
+    } else {
+      await unlink(keyPath).catch(() => undefined);
     }
-    setSetting('gemini_key_configured', body.geminiKey ? '1' : '0');
-    setSetting('billing_acknowledged', body.billingAcknowledged ? '1' : setting('billing_acknowledged', '0'));
+    setSetting(`${provider}_key_configured`, submittedKey ? '1' : '0');
+    if (provider === 'gemini') setSetting('billing_acknowledged', body.billingAcknowledged ? '1' : setting('billing_acknowledged', '0'));
   }
   if (body.browserSessionEnabled !== undefined) setSetting('browser_session_enabled', body.browserSessionEnabled ? '1' : '0');
   if (body.browserName !== undefined) setSetting('browser_name', body.browserName ?? '');
   if (body.dailyCloudCap !== undefined) { if (!Number.isInteger(body.dailyCloudCap) || body.dailyCloudCap < 1 || body.dailyCloudCap > 30) return reply.code(400).send({ error: 'The daily cap must be between 1 and 30.' }); setSetting('daily_cloud_cap', String(body.dailyCloudCap)); }
   if (body.processingPaused !== undefined) setSetting('processing_paused', body.processingPaused ? '1' : '0');
-  return reply.send(Settings.parse({
-    hasGeminiKey: setting('gemini_key_configured', '0') === '1', browserSessionEnabled: setting('browser_session_enabled', '0') === '1',
-    browserName: (setting('browser_name', '') || null) as 'chrome' | 'firefox' | null, dailyCloudCap: Number(setting('daily_cloud_cap', '30')),
-    cloudCallsToday: Number(setting('cloud_calls_today', '0')), processingPaused: setting('processing_paused', '0') === '1', dataDirectory,
-    gatewayStatus: setting('gemini_key_configured', '0') === '1' ? 'unavailable' : 'not_configured', model: 'gemini-2.5-flash-lite'
-  }));
+  return reply.send(settingsPayload());
 });
 
 app.post('/api/items/:id/original/delete', async (request, reply) => {
