@@ -198,6 +198,7 @@ function GraphView({ selectedId, setSelectedId, topic, setTopic }: { selectedId:
 const providerFallbacks = [
   { id: 'groq', name: 'Groq', model: 'groq/qwen/qwen3.6-27b', keyUrl: 'https://console.groq.com/keys', docsUrl: 'https://console.groq.com/docs/vision', freeSummary: 'Free Qwen 3.6 vision tier: 30 RPM, 1,000 requests/day, 8,000 TPM, and 200,000 TPD.', supportsVision: true },
   { id: 'openrouter', name: 'OpenRouter Free', model: 'openrouter/openrouter/free', keyUrl: 'https://openrouter.ai/settings/keys', docsUrl: 'https://openrouter.ai/docs/cookbook/get-started/free-models-router-playground', freeSummary: 'Free router for text and images. Without purchased credits, OpenRouter documents 50 free-model requests/day.', supportsVision: true },
+  { id: 'mistral', name: 'Mistral Free', model: 'mistral/mistral-small-latest', keyUrl: 'https://console.mistral.ai/api-keys', docsUrl: 'https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key', freeSummary: 'Mistral Studio Free mode needs no credit card. Mistral Small accepts text and images; limits apply.', supportsVision: true },
   { id: 'gemini', name: 'Google Gemini', model: 'gemini/gemini-2.5-flash-lite', keyUrl: 'https://aistudio.google.com/api-keys', docsUrl: 'https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite', freeSummary: 'Google AI Studio Developer API free tier when billing is disabled.', supportsVision: true }
 ] as const;
 

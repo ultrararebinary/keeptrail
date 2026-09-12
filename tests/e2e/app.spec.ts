@@ -19,5 +19,6 @@ test.describe('Keeptrail desktop shell', () => {
     await expect(page.getByLabel('AI provider')).toHaveValue('groq');
     await expect(page.getByLabel('Groq API key')).toHaveAttribute('type', 'password');
     await expect(page.getByRole('option', { name: 'OpenRouter Free' })).toHaveCount(1);
+    await expect(page.getByRole('option', { name: 'Mistral Free' })).toHaveCount(1);
   });
 });

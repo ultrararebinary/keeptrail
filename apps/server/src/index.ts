@@ -45,6 +45,11 @@ const providers = {
     keyUrl: 'https://openrouter.ai/settings/keys', docsUrl: 'https://openrouter.ai/docs/cookbook/get-started/free-models-router-playground',
     freeSummary: 'The Free Models Router accepts text and images and chooses an available free vision model. OpenRouter documents 50 free-model requests/day without purchased credits; availability can change.', supportsVision: true
   },
+  mistral: {
+    id: 'mistral', name: 'Mistral Free', model: 'mistral/mistral-small-latest',
+    keyUrl: 'https://console.mistral.ai/api-keys', docsUrl: 'https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key',
+    freeSummary: 'Mistral Studio Free mode needs no credit card. Mistral Small accepts text and images; usage and rate limits apply.', supportsVision: true
+  },
   gemini: {
     id: 'gemini', name: 'Google Gemini', model: 'gemini/gemini-2.5-flash-lite',
     keyUrl: 'https://aistudio.google.com/api-keys', docsUrl: 'https://ai.google.dev/gemini-api/docs/pricing#gemini-2.5-flash-lite',
@@ -188,7 +193,7 @@ app.get('/api/settings', async () => settingsPayload());
 app.patch('/api/settings', async (request, reply) => {
   const body = request.body as { provider?: string; apiKey?: string | null; geminiKey?: string | null; browserSessionEnabled?: boolean; browserName?: 'chrome' | 'firefox' | null; dailyCloudCap?: number; processingPaused?: boolean; billingAcknowledged?: boolean };
   const selected = body.provider === undefined ? currentProvider() : ProviderId.safeParse(body.provider);
-  if (typeof selected !== 'string' && !selected.success) return reply.code(400).send({ error: 'Choose Groq, OpenRouter Free, or Google Gemini.' });
+  if (typeof selected !== 'string' && !selected.success) return reply.code(400).send({ error: 'Choose Groq, OpenRouter Free, Mistral Free, or Google Gemini.' });
   const provider = typeof selected === 'string' ? selected : selected.data;
   setSetting('ai_provider', provider);
   const submittedKey = body.apiKey !== undefined ? body.apiKey : provider === 'gemini' ? body.geminiKey : undefined;

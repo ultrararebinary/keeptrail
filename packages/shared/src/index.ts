@@ -147,7 +147,7 @@ export const UpdateItemRequest = z.object({
   collectionIds: z.array(z.string().uuid()).max(30).optional()
 }).strict();
 
-export const ProviderId = z.enum(['groq', 'openrouter', 'gemini']);
+export const ProviderId = z.enum(['groq', 'openrouter', 'mistral', 'gemini']);
 export type ProviderId = z.infer<typeof ProviderId>;
 
 export const ProviderDescriptor = z.object({

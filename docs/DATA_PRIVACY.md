@@ -7,13 +7,13 @@ Keeptrail is local-first by default.
 - SQLite metadata, notes, tags, collections, transcripts, captures, and search chunks.
 - Original imported files until the user explicitly deletes them.
 - Local page parsing and the planned Whisper transcription path.
-- The selected provider key, stored as `config/groq.key`, `config/openrouter.key`, or `config/gemini.key` with filesystem mode 0600 when configured.
+- The selected provider key, stored as `config/groq.key`, `config/openrouter.key`, `config/mistral.key`, or `config/gemini.key` with filesystem mode 0600 when configured.
 
 The server never returns the key value and does not place it in SQLite, browser storage, logs, exports, or URLs.
 
 ## Leaves this Mac only after opt-in
 
-Selected text and captures may be sent through the configured local gateway to Groq, OpenRouter Free, or Google Gemini for analysis. The app shows the selected provider and its terms in Settings. The current worker does not make that cloud call yet; cloud-dependent jobs remain visibly gated.
+Selected text and captures may be sent through the configured local gateway to Groq, OpenRouter Free, Mistral Free, or Google Gemini for analysis. The app shows the selected provider and its terms in Settings. The current worker does not make that cloud call yet; cloud-dependent jobs remain visibly gated.
 
 ## User controls
 

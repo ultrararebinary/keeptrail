@@ -32,6 +32,8 @@ The easiest setup is **Groq**. Open [GroqCloud](https://console.groq.com/), crea
 
 You can also use **OpenRouter Free**. Create an account at [OpenRouter](https://openrouter.ai/), open [Settings → Keys](https://openrouter.ai/settings/keys), choose **Create Key**, and copy it once. Do not purchase credits. In Keeptrail, choose **OpenRouter Free**, paste the key, and select **Save provider**. Its Free Models Router selects an available free vision model automatically.
 
+**Mistral Free** is another option. Open [Mistral Studio](https://console.mistral.ai/), create an account, open [API Keys](https://console.mistral.ai/api-keys), choose **Create new key**, name it `Keeptrail`, and copy it once. Mistral's Free mode does not require a credit card. In Keeptrail, choose **Mistral Free**, paste the key, and select **Save provider**. Mistral Small supports text and screenshots.
+
 Google Gemini is still available if your account can use it; its instructions remain in [Free provider setup](docs/PROVIDERS.md). Keep every key private. Keeptrail stores the selected key in the local data directory with mode 0600 and never returns the value through the API. Never paste a key into GitHub, a prompt, a screenshot, or chat.
 
 Selected source text and screenshots leave the machine for analysis. Read each provider's terms and current limits before use. Keeptrail's provider-specific links and quotas are documented in [PROVIDERS.md](docs/PROVIDERS.md).
@@ -57,7 +59,7 @@ On a different machine, the agent can start `gh auth login --hostname github.com
 | Job | Selection | Key |
 | --- | --- | --- |
 | Local transcription | whisper.cpp v1.9.4 + ggml-small.bin, multilingual | None |
-| Text extraction and synthesis | Groq Qwen 3.6 or OpenRouter Free through OmniRoute 3.8.50 | Selected provider key |
+| Text extraction and synthesis | Groq Qwen 3.6, Mistral Small, or OpenRouter Free through OmniRoute 3.8.50 | Selected provider key |
 | Screenshot/image understanding | Same selected multimodal provider | Same key |
 | Semantic search | Quantized multilingual-e5-small, local CPU | None |
 

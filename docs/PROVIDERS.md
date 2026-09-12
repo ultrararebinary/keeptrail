@@ -1,6 +1,6 @@
 # Free AI providers for Keeptrail
 
-Keeptrail can route text extraction and screenshot understanding through OmniRoute. Google Gemini remains available, but it is not required. The two alternatives below are the supported free choices in the Settings screen.
+Keeptrail can route text extraction and screenshot understanding through OmniRoute. Google Gemini remains available, but it is not required. Groq, Mistral Free, and OpenRouter Free are the supported free choices in the Settings screen.
 
 ## Recommended: Groq
 
@@ -21,6 +21,25 @@ Create the account and key:
 The key is stored in Keeptrail's protected local data directory. It is sent only from the local server to the selected gateway connection; it is never placed in browser storage or Git.
 
 Read the [Groq vision documentation](https://console.groq.com/docs/vision) and [free-plan rate limits](https://console.groq.com/docs/rate-limits) for current limits. Providers can change models and quotas; Keeptrail surfaces an error instead of silently switching to a paid model.
+
+## Alternative: Mistral Free mode
+
+Mistral Studio offers a Free mode with API access enabled by default and no credit card required. Mistral Small supports text and image inputs, which covers Keeptrail's transcript and screenshot analysis:
+
+- Provider in Keeptrail: **Mistral Free**
+- OmniRoute model: `mistral/mistral-small-latest`
+- Inputs: text and images; output: text/JSON
+- Free mode has limited usage and rate limits; Mistral's current limits are shown in the Studio Admin panel.
+
+Create the account and key:
+
+1. Open [Mistral Studio](https://console.mistral.ai/) and create an account or sign in.
+2. Open [API Keys](https://console.mistral.ai/api-keys), choose **Create new key**, and name it `Keeptrail`.
+3. Keep the organization in **Free mode**; do not enable pay-as-you-go for this test.
+4. Copy the key immediately. Mistral shows the full key only once.
+5. In Keeptrail, open **Settings → Provider health**, choose **Mistral Free**, paste the key, and choose **Save provider**.
+
+Read Mistral's [API-key quickstart](https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key), [vision documentation](https://docs.mistral.ai/studio/conversations/vision), and [rate-limit guidance](https://help.mistral.ai/en/articles/698531-why-am-i-hitting-api-rate-limits-and-how-do-i-increase-them). Mistral's API is served from EU data centers by default. Keeptrail never falls back to a paid Mistral route.
 
 ## Alternative: OpenRouter Free Models Router
 
@@ -58,9 +77,10 @@ These IDs are taken from the pinned OmniRoute v3.8.50 provider registry used by 
 | Keeptrail option | OmniRoute provider | OmniRoute model | Gateway behavior |
 | --- | --- | --- | --- |
 | Groq | `groq` | `groq/qwen/qwen3.6-27b` | Fixed multimodal Qwen model |
+| Mistral Free | `mistral` | `mistral/mistral-small-latest` | Fixed multimodal Mistral model |
 | OpenRouter Free | `openrouter` | `openrouter/openrouter/free` | Free-only dynamic router |
 | Google Gemini | `gemini` | `gemini/gemini-2.5-flash-lite` | Fixed Gemini model |
 
 Keeptrail creates separate managed provider connections and stores each key separately. Selecting a provider does not copy, expose, or delete another provider's key.
 
-The provider and model IDs above were checked against OmniRoute's pinned [Groq registry](https://github.com/diegosouzapw/OmniRoute/blob/v3.8.50/open-sse/config/providers/registry/groq/index.ts), [OpenRouter registry](https://github.com/diegosouzapw/OmniRoute/blob/v3.8.50/open-sse/config/providers/registry/openrouter/index.ts), and [Gemini registry](https://github.com/diegosouzapw/OmniRoute/blob/v3.8.50/open-sse/config/providers/registry/gemini/index.ts).
+The provider and model IDs above were checked against OmniRoute's pinned [Groq registry](https://github.com/diegosouzapw/OmniRoute/blob/v3.8.50/open-sse/config/providers/registry/groq/index.ts), [Mistral registry](https://github.com/diegosouzapw/OmniRoute/blob/v3.8.50/open-sse/config/providers/registry/mistral/index.ts), [OpenRouter registry](https://github.com/diegosouzapw/OmniRoute/blob/v3.8.50/open-sse/config/providers/registry/openrouter/index.ts), and [Gemini registry](https://github.com/diegosouzapw/OmniRoute/blob/v3.8.50/open-sse/config/providers/registry/gemini/index.ts).

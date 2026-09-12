@@ -22,7 +22,7 @@ The MVP combines a search-oriented library with a transit-map exploration view. 
 
 ## Intended data flow
 
-Local storage and transcription. Selected text and captures are sent through a local OmniRoute gateway to the provider selected in Settings. Groq and OpenRouter Free are the recommended free options; Google Gemini remains optional. Free provider quotas and source-download restrictions apply. Keeptrail never silently switches to paid inference.
+Local storage and transcription. Selected text and captures are sent through a local OmniRoute gateway to the provider selected in Settings. Groq, Mistral Free, and OpenRouter Free are the recommended free options; Google Gemini remains optional. Free provider quotas and source-download restrictions apply. Keeptrail never silently switches to paid inference.
 
 ## Start locally
 
