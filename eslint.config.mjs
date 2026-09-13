@@ -2,7 +2,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', 'playwright-report/**', 'test-results/**', '.keeptrail/**']
+    ignores: ['**/dist/**', '**/node_modules/**', '**/.tools/**', 'playwright-report/**', 'test-results/**', '.keeptrail/**']
   },
   ...tseslint.configs.recommended,
   {

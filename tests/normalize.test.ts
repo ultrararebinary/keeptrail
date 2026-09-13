@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeSource, rejectPrivateHostname } from '../packages/core/src/normalize';
+import { importUrl, openDatabase, closeDatabase } from '../packages/core/src/index';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 describe('normalizeSource', () => {
   it('canonicalizes a YouTube watch URL to its stable video id', () => {
@@ -23,5 +27,26 @@ describe('normalizeSource', () => {
     expect(() => normalizeSource('http://127.0.0.1/')).toThrow(/private destinations/i);
     expect(() => normalizeSource('https://www.youtube.com/channel/keeptrail')).toThrow(/individual YouTube/i);
     expect(rejectPrivateHostname('192.168.1.20')).toMatch(/private destinations/i);
+  });
+
+  it('does not classify lookalike domains as social platforms', () => {
+    expect(normalizeSource('https://notyoutube.com/watch?v=page-1').platform).toBe('web');
+    expect(normalizeSource('https://notinstagram.com/reel/ABC').platform).toBe('web');
+    expect(normalizeSource('https://nottiktok.com/video/123').platform).toBe('web');
+  });
+
+  it('keeps distinct ordinary web paths distinct when platform id is null', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'keeptrail-normalize-'));
+    const db = openDatabase(directory);
+    try {
+      const first = importUrl(db, 'https://example.com/library/one');
+      const second = importUrl(db, 'https://example.com/library/two');
+      expect(first.kind).toBe('created');
+      expect(second.kind).toBe('created');
+      expect(second.id).not.toBe(first.id);
+    } finally {
+      closeDatabase(db);
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

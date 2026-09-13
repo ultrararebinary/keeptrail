@@ -1,26 +1,28 @@
 # Implementation status
 
-This file tracks the Keeptrail MVP contract. It is updated as implementation and verification progress.
+Reviewed 2026-09-13. **REQUEST CHANGES — not ready for release or merge.**
 
-## Current state
+Real integrations exist, but passing compilation and 23 unit tests do not establish a working end-to-end pipeline. The previous delivery report overstated acceptance. Internal defects must be separated from external provider/platform limits. See [CODE_REVIEW.md](CODE_REVIEW.md).
 
-- Repository: initialized on `main`; MVP shell is implemented and verified locally.
-- Product/design context: `PRODUCT.md` and `DESIGN.md` are present.
-- Design references: `docs/design/index-reference.png` and `docs/design/parcours-reference.png` inspected and treated as layout references only.
-- UI/UX direction: approved graphite Search + Explore product shell with coral action, semantic topic routes, evidence-first detail, and accessible list alternatives.
-
-## Acceptance tracking
-
-| Area | Status | Evidence / blocker |
+| Area | Current evidence | Remaining gate |
 | --- | --- | --- |
-| Repository and docs | implemented | Runnable workspace, pinned dependencies, bootstrap, architecture/privacy/security docs, and explicit status tracking. |
-| Search and Explore UI | implemented | Search/Explore/Settings shell, filters, detail evidence, inline capture, map/list alternative, responsive CSS, and live browser verification. |
-| Persistent data model | implemented | SQLite migrations, FTS table, indexes, topics, durable jobs, local file directories, and isolated Vitest coverage. |
-| Acquisition and processing | partial | URL validation, ordinary-page Readability extraction, upload limits, deduplication, and durable queue are implemented. Social download, Whisper, and rich media analysis remain pending. |
-| Managed provider/OmniRoute setup | partial | Settings now supports Groq, OpenRouter Free, Mistral Free, and Gemini with separate mode-0600 key files and provider-specific setup links. Actual OmniRoute calls and quota enforcement remain pending. |
-| Search/indexing | partial | Local keyword search, snippets, evidence IDs, and FTS schema exist. Embedding generation and hybrid reranking remain pending. |
-| Exports/storage/settings | implemented | JSON export, note/tag updates, original deletion endpoint, storage summary, settings, and privacy copy are covered. |
-| Read-only MCP | implemented | stdio server exposes four read-only library/topic/passage tools. |
-| Automated tests | implemented | Vitest unit/component coverage and Playwright desktop smoke coverage pass locally. |
-| Live social/provider validation | not run | Requires user-provided live URLs and a key for the selected provider. |
-| M1 benchmark | not run | Requires local benchmark run on target hardware. |
+| Build and regression suite | 9 files / 23 tests, strict lint, typecheck and four builds passed again | Broad contract acceptance is not covered |
+| Acquisition | Real yt-dlp and loopback proxy code | The one-download limit produces exit 101, rejected by the wrapper; browser cookies/native-downloader policy is not wired |
+| Network safety | DNS pinning and bounded page reads exist | IPv6 mapped/expanded loopback bypasses classification; media protocol allowlists are absent |
+| Queue and restart | SQLite jobs and renewable job leases exist | Heavy lock is not renewed; stage completion is not atomic with successor creation; active pause/cancel and chunk recovery are incomplete |
+| Whisper/tool provisioning | Installer and historical silence-only benchmark exist | Default worker does not consume installed model/executable paths; representative WER and aggregate-memory acceptance missing |
+| Frames | 2 fps extraction and economical planner exist | Storage cap is checked after extraction; all planned images are loaded into memory; thumbnail/crop/cache pipeline incomplete |
+| Cloud analysis | Managed gateway, restricted-key setup, schemas and reservations exist | Live health unverified; retry scheduling, evidence prompts, context truncation and credential replacement need correction |
+| Indexing/search | FTS keyword lookup and embedding/RRF helpers exist | Video index stage does not index transcripts; semantic ranking is not called; embedding child lifecycle absent |
+| UI/map/media | Virtualized list, detail controls, explicit video load and range handler exist | Import-to-result, detail pagination, world-viewport map, thumbnail generation and codec fallback not accepted |
+| MCP | Six stdio tools using read-only SQLite | Not the contracted authenticated API; protocol acceptance missing |
+| Test infrastructure | Deterministic tests pass | Playwright reuses port 4317 and expects existing demos; no committed GitHub Actions workflow |
+
+## Review environment facts
+
+- Read-only checks identify **Apple M1, 8 GiB RAM**. Target hardware is available; the representative workload has not been measured.
+- Metadata-only checks find Mistral selected, its configured flag set and its key file present. No key value was read or printed. Presence is not validity or provider health.
+- The earlier Instagram exit 101 is not proof of an external denial: an offline invocation of installed yt-dlp reproduces it with the one-download limit. Revalidate after fixing acquisition.
+- Other social platforms, cloud inference, reference-speech WER and the performance corpus remain unverified.
+
+This review changes documentation, not application behavior. Preserve this implementation as a review snapshot; resolve the security/pipeline findings and add regression tests before merging.

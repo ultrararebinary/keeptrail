@@ -83,7 +83,38 @@ const migrations = [
   `CREATE INDEX IF NOT EXISTS idx_items_created_at ON items(created_at DESC);`,
   `CREATE INDEX IF NOT EXISTS idx_jobs_runnable ON jobs(status, next_attempt_at);`,
   `CREATE INDEX IF NOT EXISTS idx_mentions_item ON mentions(item_id);`,
-  `CREATE INDEX IF NOT EXISTS idx_segments_item ON transcript_segments(item_id, start_ms);`
+  `CREATE INDEX IF NOT EXISTS idx_segments_item ON transcript_segments(item_id, start_ms);`,
+  `ALTER TABLE items ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0;
+   CREATE TABLE IF NOT EXISTS inference_calls (
+     id TEXT PRIMARY KEY, item_id TEXT REFERENCES items(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL, provider TEXT NOT NULL, requested_model TEXT NOT NULL,
+     returned_model TEXT, input_hash TEXT NOT NULL, status TEXT NOT NULL,
+     estimated_tokens INTEGER NOT NULL DEFAULT 0, actual_tokens INTEGER,
+     retry_after_at TEXT, attempt INTEGER NOT NULL DEFAULT 1,
+     outcome_unknown INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+     started_at TEXT, completed_at TEXT
+   );
+   CREATE INDEX IF NOT EXISTS idx_inference_calls_created ON inference_calls(created_at);
+   CREATE INDEX IF NOT EXISTS idx_inference_calls_item ON inference_calls(item_id);
+   CREATE TABLE IF NOT EXISTS processing_locks (
+     name TEXT PRIMARY KEY, owner TEXT NOT NULL, lease_expires_at TEXT NOT NULL, updated_at TEXT NOT NULL
+   );
+   CREATE TRIGGER IF NOT EXISTS search_chunks_ai AFTER INSERT ON search_chunks BEGIN
+     INSERT INTO search_chunks_fts(rowid, body) VALUES (new.rowid, new.body);
+   END;
+   CREATE TRIGGER IF NOT EXISTS search_chunks_ad AFTER DELETE ON search_chunks BEGIN
+     INSERT INTO search_chunks_fts(search_chunks_fts, rowid, body) VALUES ('delete', old.rowid, old.body);
+   END;
+   CREATE TRIGGER IF NOT EXISTS search_chunks_au AFTER UPDATE OF body ON search_chunks BEGIN
+     INSERT INTO search_chunks_fts(search_chunks_fts, rowid, body) VALUES ('delete', old.rowid, old.body);
+     INSERT INTO search_chunks_fts(rowid, body) VALUES (new.rowid, new.body);
+   END;
+   INSERT INTO search_chunks_fts(search_chunks_fts) VALUES ('rebuild');`,
+  `ALTER TABLE items ADD COLUMN cloud_status TEXT NOT NULL DEFAULT 'not_requested';
+   CREATE INDEX IF NOT EXISTS idx_items_cloud_status ON items(cloud_status);`,
+  `ALTER TABLE items ADD COLUMN parent_item_id TEXT REFERENCES items(id) ON DELETE SET NULL;
+   ALTER TABLE items ADD COLUMN media_index INTEGER;
+   CREATE INDEX IF NOT EXISTS idx_items_parent_media ON items(parent_item_id, media_index);`
 ];
 
 export type KeeptrailDb = Database.Database;
@@ -96,6 +127,10 @@ export function openDatabase(dataDirectory = getDataDirectory()): KeeptrailDb {
   db.pragma('busy_timeout = 5000');
   migrate(db);
   return db;
+}
+
+export function openReadOnlyDatabase(dataDirectory = getDataDirectory()): KeeptrailDb {
+  return new Database(join(dataDirectory, 'keeptrail.sqlite'), { readonly: true, fileMustExist: true });
 }
 
 export function migrate(db: KeeptrailDb): void {

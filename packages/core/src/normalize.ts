@@ -37,9 +37,10 @@ export function normalizeSource(raw: string): NormalizedSource {
 
   const host = parsed.hostname.toLowerCase();
   const path = parsed.pathname.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
-  const youtube = host === 'youtu.be' || host.endsWith('youtube.com');
-  const instagram = host.endsWith('instagram.com');
-  const tiktok = host.endsWith('tiktok.com');
+  const isDomain = (domain: string): boolean => host === domain || host.endsWith(`.${domain}`);
+  const youtube = host === 'youtu.be' || isDomain('youtube.com');
+  const instagram = isDomain('instagram.com');
+  const tiktok = isDomain('tiktok.com');
   const x = host === 'x.com' || host === 'twitter.com' || host.endsWith('.x.com') || host.endsWith('.twitter.com');
   let platform: NormalizedSource['platform'] = 'web';
   let platformId: string | null = null;

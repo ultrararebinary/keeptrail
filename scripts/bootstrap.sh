@@ -35,7 +35,7 @@ export PATH="${node_dir}/bin:${PATH}"
 cd "${repo_dir}"
 node --version
 npm --version
-npm install
+npm ci
 npm run build
 npm run setup
 echo "Keeptrail is ready. Run: ${repo_dir}/scripts/keeptrail start"

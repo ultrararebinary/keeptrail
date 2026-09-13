@@ -1,9 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { getItemDetail, getDataDirectory, listLibrary, openDatabase } from '@keeptrail/core';
+import { capabilities, getItemDetail, getDataDirectory, itemDiagnostics, listLibrary, openReadOnlyDatabase } from '@keeptrail/core';
 
-const db = openDatabase(getDataDirectory());
+const db = openReadOnlyDatabase(getDataDirectory());
 const server = new McpServer({ name: 'keeptrail', version: '0.1.0' });
 
 function text(value: unknown): { content: [{ type: 'text'; text: string }] } {
@@ -35,9 +35,22 @@ server.tool('get_passages', 'Get exact evidence passages for one Keeptrail item.
 
 server.tool('list_topics', 'List Keeptrail topics. Read-only.', {
   limit: z.number().int().min(1).max(50).optional(), cursor: z.string().optional()
-}, async ({ limit }) => {
-  const result = listLibrary(db, { limit: 1 });
-  return text({ topics: result.topics.slice(0, limit ?? 50), nextCursor: null });
+}, async ({ limit, cursor }) => {
+  const pageLimit = limit ?? 50;
+  const offset = cursor ? Number(Buffer.from(cursor, 'base64url').toString('utf8')) : 0;
+  const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
+  const rows = db.prepare('SELECT slug,label,color_token AS colorToken,(SELECT COUNT(*) FROM item_topics it WHERE it.topic_slug=t.slug) AS itemCount FROM topics t ORDER BY display_order LIMIT ? OFFSET ?').all(pageLimit + 1, safeOffset) as Array<{ slug: string; label: string; colorToken: string; itemCount: number }>;
+  const hasMore = rows.length > pageLimit;
+  return text({ topics: rows.slice(0, pageLimit), nextCursor: hasMore ? Buffer.from(String(safeOffset + pageLimit)).toString('base64url') : null });
 });
+
+server.tool('get_processing_status', 'Get bounded processing status for one item. Read-only.', {
+  itemId: z.string().uuid()
+}, async ({ itemId }) => {
+  const report = itemDiagnostics(db, itemId);
+  return text(report ? { itemId: report.itemId, status: report.status, errorCode: report.errorCode, retryable: report.retryable, counts: report.counts, jobs: report.jobs } : { error: 'Item not found.' });
+});
+
+server.tool('get_capabilities', 'Get Keeptrail capability and prerequisite status. Read-only.', {}, async () => text({ capabilities }));
 
 await server.connect(new StdioServerTransport());

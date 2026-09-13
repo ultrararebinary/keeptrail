@@ -3,11 +3,12 @@ import { basename } from 'node:path';
 import type { KeeptrailDb } from './db.js';
 import { normalizeSource, normalizeTag, newId } from './normalize.js';
 import type { GraphResponse, ItemDetail, LibraryItem, LibraryResponse, Topic } from '@keeptrail/shared';
+import { keywordItemRanking } from './search.js';
 
 type ItemRow = {
   id: string; type: LibraryItem['type']; platform: LibraryItem['platform']; source_url: string | null; platform_id: string | null;
   title: string; author: string | null; status: LibraryItem['status']; created_at: string; published_at: string | null;
-  duration_ms: number | null; thumbnail_asset_id: string | null; summary: string; website_count: number; original_bytes: number | null;
+  duration_ms: number | null; thumbnail_asset_id: string | null; original_asset_id: string | null; summary: string; website_count: number; original_bytes: number | null;
 };
 
 const topicColors: Record<string, Topic['colorToken']> = { sage: 'sage', ochre: 'ochre', lilac: 'lilac', coral: 'coral', blue: 'blue', moss: 'moss', plum: 'plum', muted: 'muted' };
@@ -15,11 +16,12 @@ const topicColors: Record<string, Topic['colorToken']> = { sage: 'sage', ochre: 
 function mapItem(row: ItemRow, db: KeeptrailDb, query?: string): LibraryItem {
   const tags = (db.prepare('SELECT t.label FROM tags t JOIN item_tags it ON it.tag_id=t.id WHERE it.item_id=? ORDER BY t.label').all(row.id) as Array<{ label: string }>).map((tag) => tag.label);
   const topics = (db.prepare('SELECT topic_slug FROM item_topics WHERE item_id=? ORDER BY topic_slug').all(row.id) as Array<{ topic_slug: string }>).map((topic) => topic.topic_slug);
-  const match = query ? (db.prepare('SELECT body, evidence_ids_json FROM search_chunks WHERE item_id=? AND body LIKE ? ORDER BY rowid LIMIT 1').get(row.id, `%${query}%`) as { body: string; evidence_ids_json: string } | undefined) : undefined;
+  const keywordMatch = query ? keywordItemRanking(db, query, 50).find((candidate) => candidate.itemId === row.id) : undefined;
+  const match = keywordMatch ? db.prepare('SELECT body, evidence_ids_json FROM search_chunks WHERE id=?').get(keywordMatch.chunkId) as { body: string; evidence_ids_json: string } | undefined : undefined;
   return {
     id: row.id, type: row.type, platform: row.platform, sourceUrl: row.source_url, platformId: row.platform_id,
     title: row.title, author: row.author, summary: row.summary, status: row.status, createdAt: row.created_at,
-    publishedAt: row.published_at, durationMs: row.duration_ms, thumbnailUrl: null, thumbnailAssetId: row.thumbnail_asset_id,
+    publishedAt: row.published_at, durationMs: row.duration_ms, thumbnailUrl: row.thumbnail_asset_id ? `/api/assets/${row.thumbnail_asset_id}` : null, thumbnailAssetId: row.thumbnail_asset_id, originalAssetId: row.original_asset_id,
     topics, tags, match: match ? { text: match.body.slice(0, 500), evidenceId: JSON.parse(match.evidence_ids_json)[0] } : null,
     websiteCount: row.website_count, originalBytes: row.original_bytes
   };
@@ -28,6 +30,7 @@ function mapItem(row: ItemRow, db: KeeptrailDb, query?: string): LibraryItem {
 function itemSelect(): string {
   return `SELECT i.id, i.type, i.platform, i.source_url, i.platform_id, i.title, i.author, i.status, i.created_at,
     i.published_at, i.duration_ms, i.thumbnail_asset_id,
+    (SELECT a.id FROM assets a WHERE a.item_id=i.id AND a.role='original' ORDER BY a.created_at LIMIT 1) AS original_asset_id,
     COALESCE((SELECT ar.summary FROM analysis_revisions ar WHERE ar.item_id=i.id ORDER BY ar.revision DESC LIMIT 1), i.description) AS summary,
     (SELECT COUNT(*) FROM mentions m WHERE m.item_id=i.id) AS website_count,
     (SELECT SUM(a.bytes) FROM assets a WHERE a.item_id=i.id AND a.role='original') AS original_bytes
@@ -39,8 +42,14 @@ export function listLibrary(db: KeeptrailDb, params: { query?: string; topic?: s
   const values: Array<string | number> = [];
   const query = params.query?.trim() ?? '';
   if (query) {
-    where.push(`(i.title LIKE ? OR i.description LIKE ? OR EXISTS (SELECT 1 FROM search_chunks sc WHERE sc.item_id=i.id AND sc.body LIKE ?))`);
-    values.push(`%${query}%`, `%${query}%`, `%${query}%`);
+    const ranked = keywordItemRanking(db, query, 50);
+    if (ranked.length) {
+      where.push(`i.id IN (${ranked.map(() => '?').join(',')})`);
+      values.push(...ranked.map((candidate) => candidate.itemId));
+    } else {
+      where.push(`(i.title LIKE ? OR i.description LIKE ? OR EXISTS (SELECT 1 FROM search_chunks sc WHERE sc.item_id=i.id AND sc.body LIKE ?))`);
+      values.push(`%${query}%`, `%${query}%`, `%${query}%`);
+    }
   }
   if (params.topic) { where.push('EXISTS (SELECT 1 FROM item_topics itf WHERE itf.item_id=i.id AND itf.topic_slug=?)'); values.push(params.topic); }
   if (params.platform) { where.push('i.platform=?'); values.push(params.platform); }
@@ -55,8 +64,9 @@ export function listLibrary(db: KeeptrailDb, params: { query?: string; topic?: s
   const platformRows = db.prepare('SELECT platform, COUNT(*) AS count FROM items GROUP BY platform').all() as Array<{ platform: LibraryItem['platform']; count: number }>;
   const platformCounts = { youtube: 0, instagram: 0, tiktok: 0, x: 0, web: 0, local: 0 } as Record<LibraryItem['platform'], number>;
   platformRows.forEach((row) => { platformCounts[row.platform] = row.count; });
-  const processingCount = (db.prepare(`SELECT COUNT(*) AS count FROM items WHERE status NOT IN ('ready','failed','canceled')`).get() as { count: number }).count;
-  return { items: rows.map((row) => mapItem(row, db, query)), total, mode: 'keyword', topics: topics.map((row) => ({ slug: row.slug, label: row.label, colorToken: topicColors[row.color_token] ?? 'muted', itemCount: row.itemCount })), tags, platformCounts, processingCount };
+  const processingCount = (db.prepare(`SELECT COUNT(*) AS count FROM items WHERE status IN ('queued','downloading','transcribing','analyzing','indexing')`).get() as { count: number }).count;
+  const next = offset + limit < total ? Buffer.from(String(offset + limit)).toString('base64url') : null;
+  return { items: rows.map((row) => mapItem(row, db, query)), total, mode: 'keyword', nextCursor: next, topics: topics.map((row) => ({ slug: row.slug, label: row.label, colorToken: topicColors[row.color_token] ?? 'muted', itemCount: row.itemCount })), tags, platformCounts, processingCount };
 }
 
 export function getItemDetail(db: KeeptrailDb, id: string): ItemDetail | null {
@@ -93,7 +103,9 @@ export function getItemDetail(db: KeeptrailDb, id: string): ItemDetail | null {
 
 export function importUrl(db: KeeptrailDb, raw: string, now = new Date().toISOString()): { kind: 'created' | 'existing'; id: string; url: string; status: LibraryItem['status'] } {
   const source = normalizeSource(raw);
-  const existing = db.prepare('SELECT id, status FROM items WHERE platform=? AND platform_id IS ? OR canonical_url=?').get(source.platform, source.platformId, source.canonicalUrl) as { id: string; status: LibraryItem['status'] } | undefined;
+  const existing = source.platformId
+    ? db.prepare('SELECT id, status FROM items WHERE (platform=? AND platform_id=?) OR canonical_url=?').get(source.platform, source.platformId, source.canonicalUrl) as { id: string; status: LibraryItem['status'] } | undefined
+    : db.prepare('SELECT id, status FROM items WHERE canonical_url=?').get(source.canonicalUrl) as { id: string; status: LibraryItem['status'] } | undefined;
   if (existing) return { kind: 'existing', id: existing.id, url: source.canonicalUrl, status: existing.status };
   const id = newId();
   const jobId = newId();
@@ -122,18 +134,29 @@ export function updateItem(db: KeeptrailDb, itemId: string, input: { note?: stri
   tx();
 }
 
-export function graph(db: KeeptrailDb, selectedTopic: string | null = null, selectedItemId: string | null = null): GraphResponse {
+export type GraphViewport = { minX?: number; maxX?: number; minY?: number; maxY?: number; cursor?: string };
+
+export function graph(db: KeeptrailDb, selectedTopic: string | null = null, selectedItemId: string | null = null, viewport: GraphViewport = {}): GraphResponse {
   const nodes: GraphResponse['nodes'] = [];
   const edges: GraphResponse['edges'] = [];
   const topics = db.prepare('SELECT slug,label,color_token,display_order FROM topics ORDER BY display_order').all() as Array<{ slug: string; label: string; color_token: Topic['colorToken']; display_order: number }>;
   const visibleTopics = selectedTopic ? topics.filter((topic) => topic.slug === selectedTopic) : topics;
   visibleTopics.forEach((topic, index) => nodes.push({ id: `topic:${topic.slug}`, kind: 'topic', label: topic.label, colorToken: topicColors[topic.color_token] ?? 'muted', x: 120, y: 120 + index * 120, selected: topic.slug === selectedTopic }));
-  const itemRows = db.prepare(`${itemSelect()} WHERE (? IS NULL OR EXISTS (SELECT 1 FROM item_topics it WHERE it.item_id=i.id AND it.topic_slug=?)) ORDER BY i.created_at, i.id LIMIT 50`).all(selectedTopic, selectedTopic) as ItemRow[];
+  const offset = viewport.cursor ? Number(Buffer.from(viewport.cursor, 'base64url').toString('utf8')) : 0;
+  const safeOffset = Number.isInteger(offset) && offset >= 0 ? offset : 0;
+  const itemRows = db.prepare(`${itemSelect()} WHERE (? IS NULL OR EXISTS (SELECT 1 FROM item_topics it WHERE it.item_id=i.id AND it.topic_slug=?)) ORDER BY i.created_at, i.id LIMIT 50 OFFSET ?`).all(selectedTopic, selectedTopic, safeOffset) as ItemRow[];
+  const savedPosition = (id: string, fallback: { x: number; y: number }): { x: number; y: number } => {
+    const existing = db.prepare('SELECT x,y FROM route_positions WHERE node_id=?').get(id) as { x: number; y: number } | undefined;
+    if (existing) return existing;
+    db.prepare('INSERT OR IGNORE INTO route_positions (node_id,x,y,updated_at) VALUES (?,?,?,?)').run(id, fallback.x, fallback.y, new Date().toISOString());
+    return fallback;
+  };
   itemRows.forEach((item, index) => {
     const topic = (db.prepare('SELECT topic_slug FROM item_topics WHERE item_id=? ORDER BY topic_slug LIMIT 1').get(item.id) as { topic_slug: string } | undefined)?.topic_slug ?? 'other';
     const laneIndex = Math.max(0, visibleTopics.findIndex((candidate) => candidate.slug === topic));
     const nodeId = `item:${item.id}`;
-    nodes.push({ id: nodeId, kind: 'item', itemId: item.id, label: item.title || 'Untitled source', subtitle: item.platform, x: 320 + (index % 5) * 190, y: 120 + laneIndex * 120, selected: item.id === selectedItemId });
+    const position = savedPosition(nodeId, { x: 320 + (index + safeOffset) * 190, y: 120 + laneIndex * 120 });
+    nodes.push({ id: nodeId, kind: 'item', itemId: item.id, label: item.title || 'Untitled source', subtitle: item.platform, ...position, selected: item.id === selectedItemId });
     edges.push({ id: `topic-edge:${topic}:${item.id}`, from: `topic:${topic}`, to: nodeId, kind: 'topic', colorToken: topicColors[topics.find((candidate) => candidate.slug === topic)?.color_token ?? 'muted'] ?? 'muted' });
   });
   const websites = db.prepare(`SELECT w.id,w.name,COUNT(m.item_id) AS uses FROM websites w JOIN mentions m ON m.website_id=w.id ${selectedTopic ? 'JOIN item_topics it ON it.item_id=m.item_id AND it.topic_slug=?' : ''} GROUP BY w.id ORDER BY uses DESC LIMIT 20`).all(...(selectedTopic ? [selectedTopic] : [])) as Array<{ id: string; name: string; uses: number }>;
@@ -143,7 +166,15 @@ export function graph(db: KeeptrailDb, selectedTopic: string | null = null, sele
     const linked = db.prepare(`SELECT item_id FROM mentions WHERE website_id=? LIMIT 4`).all(website.id) as Array<{ item_id: string }>;
     linked.forEach((item) => { if (nodes.some((node) => node.id === `item:${item.item_id}`)) edges.push({ id: `website-edge:${website.id}:${item.item_id}`, from: `item:${item.item_id}`, to: nodeId, kind: 'website', label: 'mentioned' }); });
   });
-  return { nodes: nodes.slice(0, 80), edges: edges.slice(0, 120), topic: selectedTopic, visibleCount: itemRows.length, hasMore: itemRows.length === 50 };
+  const minX = viewport.minX ?? Number.NEGATIVE_INFINITY;
+  const maxX = viewport.maxX ?? Number.POSITIVE_INFINITY;
+  const minY = viewport.minY ?? Number.NEGATIVE_INFINITY;
+  const maxY = viewport.maxY ?? Number.POSITIVE_INFINITY;
+  const visibleIds = new Set(nodes.filter((node) => node.kind === 'topic' || (node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY) || node.itemId === selectedItemId).map((node) => node.id));
+  const visibleNodes = nodes.filter((node) => visibleIds.has(node.id)).slice(0, 80);
+  const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
+  const nextCursor = itemRows.length === 50 ? Buffer.from(String(safeOffset + 50)).toString('base64url') : null;
+  return { nodes: visibleNodes, edges: edges.filter((edge) => visibleNodeIds.has(edge.from) && visibleNodeIds.has(edge.to)).slice(0, 120), topic: selectedTopic, visibleCount: visibleNodes.filter((node) => node.kind === 'item').length, hasMore: nextCursor !== null, nextCursor };
 }
 
 export function seedDemo(db: KeeptrailDb): void {
@@ -162,7 +193,7 @@ export function seedDemo(db: KeeptrailDb): void {
       const id = `11111111-1111-4111-8111-${String(index + 1).padStart(12, '0')}`;
       const websiteId = `22222222-2222-4222-8222-${String(index + 1).padStart(12, '0')}`;
       if (!db.prepare('SELECT 1 FROM items WHERE id=?').get(id)) {
-        db.prepare(`INSERT INTO items (id,type,platform,source_url,canonical_url,platform_id,title,author,description,status,created_at,published_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(id, example.platform === 'web' ? 'page' : 'video', example.platform, example.url, example.url, `demo-${index}`, example.title, example.author, example.summary, 'ready', new Date(Date.now() - index * 86400000).toISOString(), now);
+        db.prepare(`INSERT INTO items (id,type,platform,source_url,canonical_url,platform_id,title,author,description,status,created_at,published_at,is_demo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`).run(id, example.platform === 'web' ? 'page' : 'video', example.platform, example.url, example.url, `demo-${index}`, example.title, example.author, example.summary, 'ready', new Date(Date.now() - index * 86400000).toISOString(), now);
         db.prepare(`INSERT INTO analysis_revisions (id,item_id,revision,title,summary,key_points_json,topics_json,image_descriptors_json,model_id,prompt_version,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(randomUUID(), id, 1, example.title, example.summary, JSON.stringify([{ text: example.summary, evidenceIds: [`description:${id}`] }]), JSON.stringify([example.topic]), JSON.stringify({ subject: [], style: [], layout: [] }), 'demo-fixture', 'demo-v1', now);
         db.prepare(`INSERT INTO evidence (id,item_id,revision,kind,label,excerpt) VALUES (?,?,?,?,?,?)`).run(`description:${id}`, id, 1, 'description', 'Source description', example.summary);
         db.prepare(`INSERT INTO search_chunks (id,item_id,source_kind,source_id,body,evidence_ids_json) VALUES (?,?,?,?,?,?)`).run(randomUUID(), id, 'description', `description:${id}`, `${example.title} ${example.summary} ${example.tags.join(' ')}`, JSON.stringify([`description:${id}`]));

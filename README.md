@@ -6,13 +6,13 @@ A local discovery library that turns saved videos, links, and images into search
 
 ## Status
 
-**MVP shell implemented.** Keeptrail now has a local Fastify API, SQLite migrations, a durable worker queue, a desktop-first Search/Explore UI, settings, exports, read-only MCP tools, fixture seeding, unit tests, and a Playwright smoke test. Provider-backed social acquisition, Whisper media transcription, local embeddings, and live OmniRoute analysis remain explicit follow-up gates and are documented as such.
+**Development snapshot — review requires changes.** Real integrations and the UI exist; 23 tests plus lint/typecheck/build pass. The [2026-09-13 review](docs/CODE_REVIEW.md) found internal acquisition, network-safety, queue and indexing defects. These are not merely external provider blockers. This snapshot is not release-ready; avoid untrusted media until the security findings are resolved.
 
 ## Build brief
 
-The MVP combines a search-oriented library with a transit-map exploration view. It targets a MacBook Air M1 with 8 GB RAM, stores data locally, transcribes through Whisper Small multilingual, and uses a selected free multimodal provider (Groq recommended, OpenRouter Free alternative, Gemini optional) through an isolated OmniRoute instance for text and vision analysis.
+The intended MVP combines a searchable library with a transit-map exploration view. It targets a MacBook Air M1 with 8 GB RAM, local Whisper transcription and selected text/vision inference through isolated OmniRoute. Small/Base speech benchmarking, semantic retrieval and end-to-end processing remain acceptance gates, not completed capabilities.
 
-- [Full implementation prompt](docs/MVP_AGENT_PROMPT.md)
+- [Full implementation contract](docs/LUNA_PIPELINES_PROMPT.md)
 - [Free provider setup](docs/PROVIDERS.md)
 - [Key preparation and agent handoff](QUICKSTART.md)
 - [Brand proposal](docs/BRAND.md)
@@ -22,19 +22,16 @@ The MVP combines a search-oriented library with a transit-map exploration view. 
 
 ## Intended data flow
 
-Local storage and transcription. Selected text and captures are sent through a local OmniRoute gateway to the provider selected in Settings. Groq, Mistral Free, and OpenRouter Free are the recommended free options; Google Gemini remains optional. Free provider quotas and source-download restrictions apply. Keeptrail never silently switches to paid inference.
+Local storage and transcription, with selected text and captures sent through local OmniRoute to the provider selected in Settings. Mistral, Groq, OpenRouter Free and Gemini are the configured options. Account terms and quotas apply; saving a key does not establish provider health or free-tier availability.
 
 ## Start locally
 
 ```sh
-npm install
-npm run build
-npm run setup
-npm run demo:seed # optional, explicit fixture data only
-npm start
+./scripts/keeptrail run build
+./scripts/keeptrail start
 ```
 
-Open `http://127.0.0.1:4317`. Use `npm run doctor` for environment checks. See [QUICKSTART.md](QUICKSTART.md) for the Node 22.23.2 bootstrap path and [docs/TEST_REPORT.md](docs/TEST_REPORT.md) for current verification evidence.
+Open [Keeptrail](http://127.0.0.1:4317). See [QUICKSTART.md](QUICKSTART.md) for first-install instructions and known runtime limitations, and [docs/TEST_REPORT.md](docs/TEST_REPORT.md) for verification evidence. A passing environment check does not establish a working video pipeline.
 
 ## License
 

@@ -61,8 +61,9 @@ export const LibraryItem = z.object({
   createdAt: z.string(),
   publishedAt: z.string().nullable(),
   durationMs: z.number().int().nonnegative().nullable(),
-  thumbnailUrl: z.string().url().nullable(),
+  thumbnailUrl: z.string().min(1).nullable(),
   thumbnailAssetId: z.string().uuid().nullable(),
+  originalAssetId: z.string().uuid().nullable(),
   topics: z.array(z.string().max(80)).max(3),
   tags: z.array(z.string().max(60)).max(8),
   match: SearchSnippet.nullable(),
@@ -98,7 +99,8 @@ export const LibraryResponse = z.object({
   topics: z.array(Topic),
   tags: z.array(z.object({ label: z.string(), count: z.number().int().nonnegative() }).strict()).max(100),
   platformCounts: z.record(Platform, z.number().int().nonnegative()),
-  processingCount: z.number().int().nonnegative()
+  processingCount: z.number().int().nonnegative(),
+  nextCursor: z.string().max(300).nullable().optional()
 }).strict();
 export type LibraryResponse = z.infer<typeof LibraryResponse>;
 
@@ -126,7 +128,8 @@ export const GraphResponse = z.object({
   edges: z.array(GraphEdge).max(120),
   topic: z.string().nullable(),
   visibleCount: z.number().int().nonnegative(),
-  hasMore: z.boolean()
+  hasMore: z.boolean(),
+  nextCursor: z.string().max(300).nullable().optional()
 }).strict();
 export type GraphResponse = z.infer<typeof GraphResponse>;
 
@@ -149,6 +152,16 @@ export const UpdateItemRequest = z.object({
 
 export const ProviderId = z.enum(['groq', 'openrouter', 'mistral', 'gemini']);
 export type ProviderId = z.infer<typeof ProviderId>;
+
+export const AnalysisBatchOutput = z.object({
+  schemaVersion: z.literal(1),
+  observations: z.array(z.string().min(1).max(600)).max(12),
+  resources: z.array(z.object({ name: z.string().min(1).max(120), evidenceIds: z.array(z.string().min(1).max(120)).min(1).max(4) }).strict()).max(4),
+  literalUrls: z.array(z.object({ url: z.string().url().max(2048), evidenceIds: z.array(z.string().min(1).max(120)).min(1).max(4) }).strict()).max(8),
+  evidenceIds: z.array(z.string().min(1).max(120)).max(16),
+  cropRequests: z.array(z.object({ captureId: z.string().uuid(), x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().gt(0).max(1), height: z.number().gt(0).max(1) }).strict()).max(2)
+}).strict();
+export type AnalysisBatchOutput = z.infer<typeof AnalysisBatchOutput>;
 
 export const ProviderDescriptor = z.object({
   id: ProviderId,
@@ -173,22 +186,34 @@ export const Settings = z.object({
   // Kept for compatibility with clients built against the original MVP shell.
   hasGeminiKey: z.boolean(),
   browserSessionEnabled: z.boolean(),
-  browserName: z.enum(['chrome', 'firefox']).nullable(),
+  browserName: z.enum(['brave', 'chrome', 'firefox']).nullable(),
   dailyCloudCap: z.number().int().min(1).max(30),
   cloudCallsToday: z.number().int().nonnegative(),
   processingPaused: z.boolean(),
   dataDirectory: z.string(),
-  gatewayStatus: z.enum(['not_configured', 'healthy', 'unavailable']),
+  gatewayStatus: z.enum(['not_configured', 'starting', 'healthy', 'unavailable']),
+  gatewayRunning: z.boolean().optional(),
+  authenticationAccepted: z.boolean().optional(),
+  textHealth: z.enum(['unknown', 'passed', 'failed']).optional(),
+  visionHealth: z.enum(['unknown', 'passed', 'failed']).optional(),
   model: z.string().max(160)
 }).strict();
 export type Settings = z.infer<typeof Settings>;
 
 export const Health = z.object({
+  schemaVersion: z.literal(1).optional(),
   ok: z.boolean(),
   version: z.string(),
   node: z.string(),
   dataDirectory: z.string(),
   database: z.enum(['ok', 'error']),
   worker: z.enum(['online', 'offline']),
-  gateway: z.enum(['configured', 'not_configured', 'unavailable'])
+  gateway: z.enum(['configured', 'not_configured', 'unavailable', 'starting']),
+  providerKeyConfigured: z.boolean().optional(),
+  capabilities: z.record(z.string(), z.enum(['implemented', 'available', 'not_implemented', 'blocked', 'waiting'])).optional()
+}).strict();
+
+export const PageCursorResponse = z.object({
+  nextCursor: z.string().max(300).nullable(),
+  total: z.number().int().nonnegative()
 }).strict();
